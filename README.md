@@ -2,13 +2,32 @@
 
 <p align="center">
   <img src="https://img.shields.io/badge/Platform-macOS%2014.0+-blue?style=for-the-badge&logo=apple" alt="Platform: macOS 14.0+" />
-  <img src="https://img.shields.io/badge/App-v1.1.0-green?style=for-the-badge" alt="App Version: v1.1.0" />
+  <a href="updates.md"><img src="https://img.shields.io/badge/App-v1.1.0-green?style=for-the-badge" alt="App Version: v1.1.0" /></a>
   <img src="https://img.shields.io/badge/Built%20with-Swift%205%20%2B%20WKWebView-orange?style=for-the-badge&logo=swift" alt="Built with Swift 5 + WKWebView" />
 </p>
 
 A native macOS menu bar app for resource-efficient YouTube audio streaming.
 
-No Electron, no Chromium — built with Swift and Apple's system **WKWebView**. Sits in your menu bar, plays YouTube audio in the background, and uses a fraction of the RAM a browser tab would.
+No Electron, no Chromium — built with Swift and Apple's system **WKWebView**. Sits in your menu bar, plays YouTube audio in the background, and uses a fraction of the RAM a browser tab would. (See [updates.md](updates.md) for the latest release notes).
+
+---
+
+## Why Build This?
+
+### The Problem
+Web browsers (especially Firefox and Chrome) are notoriously resource-heavy, consuming a massive amount of memory and GPU rendering power just to stream background audio. And also other open-source, third-party clients often feel bloated or heavy, or simply don't meet my need.
+
+At the same time, most minimal or custom players strip away account features entirely. Syncing playback history directly to a main YouTube account is a must-have criteria (simply for seamless history tracking), for no reason, i just want to keep it as it is.
+
+### The Solution
+Finding nothing that was lightweight, bug-free, and supported direct history syncing, **YT Audio Air** was built. It runs natively in the macOS menu bar, keeps history synced, and operates on a fraction of a browser's resources.
+
+Best of all: **zero data is collected** and not even interested in doing so :).
+
+This project was built using Xcode and Swift, with developer assistance from:
+- **Open Code**
+- **Antigravity & Antigravity IDE**
+
 
 ---
 
