@@ -15,7 +15,6 @@ struct ContentView: View {
     @State private var canGoForward = false
     @State private var isLoading = false
     @State private var pageTitle = "YT Audio Air"
-    @State private var isVisible = false
     
     var body: some View {
         VStack(spacing: 0) {
@@ -28,24 +27,20 @@ struct ContentView: View {
             )
             
             // ── WebView ──
-            WebViewContainer(isVisible: isVisible)
+            WebViewContainer()
                 .frame(width: 375, height: 480)
             
             // ── Footer ──
             FooterView()
         }
+        .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
         .background(
             VisualEffectView(material: .hudWindow, blendingMode: .behindWindow)
+                .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
         )
         .preferredColorScheme(.dark)
         .onAppear {
-            isVisible = true
-            AppDelegate.shared?.retrieveWebViewFromOffscreen()
             startNavigationPolling()
-        }
-        .onDisappear {
-            isVisible = false
-            AppDelegate.shared?.parkWebViewOffscreen()
         }
     }
     
@@ -234,7 +229,7 @@ struct FooterView: View {
                 Spacer()
                 
                 // Version (middle)
-                Text("v1.0.0")
+                Text("v1.1.0")
                     .font(.system(size: 8.5, weight: .semibold, design: .monospaced))
                     .foregroundColor(.white.opacity(0.18))
                 
@@ -270,36 +265,28 @@ struct FooterView: View {
 // MARK: - WebViewContainer (NSViewRepresentable)
 
 struct WebViewContainer: NSViewRepresentable {
-    var isVisible: Bool
-    
     func makeNSView(context: Context) -> NSView {
         let container = NSView()
         container.wantsLayer = true
         container.layer?.backgroundColor = NSColor.black.cgColor
+        
+        if let appDelegate = AppDelegate.shared, let webView = appDelegate.webView {
+            webView.removeFromSuperview()
+            webView.translatesAutoresizingMaskIntoConstraints = false
+            container.addSubview(webView)
+            
+            NSLayoutConstraint.activate([
+                webView.leadingAnchor.constraint(equalTo: container.leadingAnchor),
+                webView.trailingAnchor.constraint(equalTo: container.trailingAnchor),
+                webView.topAnchor.constraint(equalTo: container.topAnchor),
+                webView.bottomAnchor.constraint(equalTo: container.bottomAnchor)
+            ])
+        }
         return container
     }
     
     func updateNSView(_ nsView: NSView, context: Context) {
-        guard let appDelegate = AppDelegate.shared, let webView = appDelegate.webView else { return }
-        
-        if isVisible {
-            if webView.superview != nsView {
-                webView.removeFromSuperview()
-                webView.translatesAutoresizingMaskIntoConstraints = false
-                nsView.addSubview(webView)
-                
-                NSLayoutConstraint.activate([
-                    webView.leadingAnchor.constraint(equalTo: nsView.leadingAnchor),
-                    webView.trailingAnchor.constraint(equalTo: nsView.trailingAnchor),
-                    webView.topAnchor.constraint(equalTo: nsView.topAnchor),
-                    webView.bottomAnchor.constraint(equalTo: nsView.bottomAnchor)
-                ])
-            }
-        } else {
-            if webView.superview == nsView {
-                webView.removeFromSuperview()
-            }
-        }
+        // No-op - the WebView remains embedded in the container
     }
 }
 

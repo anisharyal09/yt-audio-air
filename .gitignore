@@ -31,3 +31,7 @@ Thumbs.db
 # Compiled applications / binaries
 *.app/
 *.app.dSYM/
+
+# notes for me
+new-feat.md
+note.md

@@ -20,23 +20,31 @@ struct yt_audio_airApp: App {
     }
 }
 
+// MARK: - PlayerPanel
+
+class PlayerPanel: NSPanel {
+    override var canBecomeKey: Bool {
+        return true
+    }
+}
+
 // MARK: - AppDelegate
 
-class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate, WKNavigationDelegate {
+class AppDelegate: NSObject, NSApplicationDelegate, WKNavigationDelegate {
     static private(set) var shared: AppDelegate?
     
     var statusItem: NSStatusItem?
-    let popover = NSPopover()
+    var playerWindow: PlayerPanel!
     
     // Persistent WebView — created once, lives forever
     var webView: WKWebView!
-    var offscreenWindow: NSWindow!
     
     // App Nap prevention token
     private var appNapActivity: NSObjectProtocol?
     
-    // Click-outside monitor
-    private var eventMonitor: Any?
+    // Click-outside monitors
+    private var localEventMonitor: Any?
+    private var globalEventMonitor: Any?
     
     func applicationDidFinishLaunching(_ notification: Notification) {
         AppDelegate.shared = self
@@ -45,8 +53,7 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate, WKNavigat
         NSApp.setActivationPolicy(.accessory)
         
         setupWebView()
-        setupOffscreenWindow()
-        setupPopover()
+        setupPlayerWindow()
         setupStatusItem()
         disableAppNap()
     }
@@ -94,6 +101,10 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate, WKNavigat
             if (window.__ytAudioAirOpt) return;
             window.__ytAudioAirOpt = true;
 
+            if (typeof window.__needsAutoplay === 'undefined') {
+                window.__needsAutoplay = false;
+            }
+
             var css = `
                 /* ═══ VIDEO VISUAL DEFLATION ═══
                    Keeps layout dimensions so YouTube player init passes,
@@ -101,10 +112,52 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate, WKNavigat
                 video {
                     opacity: 0.001 !important;
                     pointer-events: none !important;
+                    width: 1px !important;
+                    height: 1px !important;
+                    transform: scale(0.001) !important;
                 }
                 .player-container, #player-container-id, .html5-video-player,
                 .video-stream {
                     background: #000000 !important;
+                }
+
+                /* Show playlist panel and style it as a clean text list */
+                ytm-playlist-panel-renderer {
+                    display: block !important;
+                    background: #121212 !important;
+                    border: 1px solid rgba(255,255,255,0.08) !important;
+                    border-radius: 8px !important;
+                    margin: 8px !important;
+                    padding: 8px !important;
+                }
+
+                /* Hide thumbnails in playlist panel to save memory & CPU */
+                ytm-playlist-panel-video-renderer .ytm-thumbnail-canvas,
+                ytm-playlist-panel-video-renderer lazy-image,
+                ytm-playlist-panel-video-renderer img {
+                    display: none !important;
+                }
+
+                /* Make playlist list items compact */
+                ytm-playlist-panel-video-renderer {
+                    padding: 6px 4px !important;
+                    border-bottom: 1px solid rgba(255,255,255,0.05) !important;
+                }
+
+                /* Playlist text layout adjustments */
+                ytm-playlist-panel-video-renderer .playlist-panel-video-metadata {
+                    padding: 2px 4px !important;
+                    margin: 0 !important;
+                }
+                ytm-playlist-panel-video-renderer h4.playlist-panel-video-title {
+                    font-size: 12px !important;
+                    font-weight: 500 !important;
+                    color: #ffffff !important;
+                    line-height: 1.3 !important;
+                }
+                ytm-playlist-panel-video-renderer .playlist-panel-video-byline {
+                    font-size: 10px !important;
+                    color: #aaaaaa !important;
                 }
 
                 /* ═══ HEAVY VISUAL/RAM DEFLATION ═══ */
@@ -112,6 +165,16 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate, WKNavigat
                 ytm-live-chat-renderer, #chat, iframe[src*="live_chat"],
                 ytm-comment-section-renderer, ytm-comments-entry-point-header-renderer,
                 #comment-section, .comment-section-renderer,
+                /* Video description & info sections */
+                ytm-video-description-header-renderer,
+                ytm-video-description-music-section-renderer,
+                ytm-slim-video-metadata-section-renderer .collapsed-content,
+                ytm-slim-video-metadata-section-renderer .smart-button-container,
+                ytm-slim-video-metadata-section-renderer .slim-video-metadata-actions,
+                ytm-engagement-panel-section-list-renderer,
+                .ytm-video-description-renderer,
+                /* Like/dislike/share/save buttons */
+                ytm-slim-video-action-bar-renderer,
                 /* Ads & Promotions (excl .ad-showing to avoid freezing player) */
                 .companion-ad, #masthead-ad, ytm-companion-ad-renderer,
                 .ad-container, .promoted-item, ytm-promoted-item,
@@ -120,18 +183,49 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate, WKNavigat
                 .ytp-ad-skip-button-slot, .ytp-ad-module,
                 ytm-companion-slot, ytm-promoted-sparkles-text-search-renderer,
                 .ytm-autonav-bar,
-                /* Related recommendations grid on watch page */
-                ytm-item-section-renderer[section-identifier="related-items"],
                 /* Animated thumbnails/avatars */
                 .ytm-animated-thumbnail,
                 /* Banners & promotions */
                 .yt-banner, ytm-banner-promo-renderer,
-                ytm-engagement-panel-section-list-renderer {
+                /* Related recommendations grid on watch page */
+                ytm-item-section-renderer[section-identifier="related-items"],
+                /* Hide Shorts, Subscriptions, and You */
+                ytm-pivot-bar-renderer-content[pivot-bar-item-id="pivot-shorts"],
+                ytm-reel-shelf-renderer {
                     display: none !important;
                     height: 0 !important;
                     max-height: 0 !important;
                     overflow: hidden !important;
                     visibility: hidden !important;
+                }
+
+                /* Reduce YouTube top header bar size */
+                ytm-header-bar, .ytm-header-bar {
+                    height: 38px !important;
+                    min-height: 38px !important;
+                    padding: 0 4px !important;
+                }
+                ytm-header-bar .header-bar-logo-container,
+                ytm-header-bar .logo-container,
+                ytm-header-bar .logo,
+                ytm-header-bar svg {
+                    transform: scale(0.75) !important;
+                    transform-origin: left center !important;
+                }
+                ytm-header-bar button,
+                ytm-header-bar .header-bar-icon,
+                ytm-header-bar a {
+                    transform: scale(0.75) !important;
+                    transform-origin: center center !important;
+                }
+                ytm-search-header-renderer, .ytm-search-header-renderer {
+                    height: 38px !important;
+                    min-height: 38px !important;
+                    padding: 0 4px !important;
+                }
+                ytm-search-header-renderer form {
+                    transform: scale(0.85) !important;
+                    transform-origin: center center !important;
                 }
             `;
 
@@ -142,95 +236,109 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate, WKNavigat
 
             var wasAdActive = false;
 
-            function optimizeVideo() {
-                document.querySelectorAll('video').forEach(function(v) {
-                    v.style.setProperty('opacity', '0.001', 'important');
-                    v.disableRemotePlayback = true;
-                    v.playsInline = true;
+            function globalUpdate() {
+                var video = document.querySelector('video');
+                if (!video) return;
 
-                    var wrapper = v.closest('.player-container, .html5-video-player');
-                    if (wrapper) {
-                        wrapper.style.setProperty('background', '#000000', 'important');
-                    }
-                });
-            }
-
-            function handleAds() {
                 var player = document.querySelector('.html5-video-player, .player-container, #player');
                 var isAd = false;
                 
                 if (player && (player.classList.contains('ad-showing') || player.classList.contains('ad-interrupting'))) {
                     isAd = true;
                 }
-                
-                if (!isAd) {
-                    var skipBtn = document.querySelector('.ytp-ad-skip-button, .ytp-ad-skip-button-modern, .ytp-ad-skip-button-slot, .ytp-ad-skip-button-container');
-                    if (skipBtn) {
-                        isAd = true;
+
+                if (isAd) {
+                    if (!video.muted) {
+                        video.muted = true;
+                        wasAdActive = true;
+                    }
+                    if (video.playbackRate !== 16) {
+                        video.playbackRate = 16;
+                    }
+                    
+                    var skipBtn = document.querySelector('.ytp-ad-skip-button, .ytp-ad-skip-button-modern, .ytp-ad-skip-button-slot button, .ytp-ad-skip-button-slot, .ytp-ad-skip-button-container, .ytp-ad-skip-button-container button, .ytm-biz-skip-ad-button');
+                    if (skipBtn && skipBtn.offsetHeight > 0) {
+                        skipBtn.click();
+                    }
+                    
+                    if (isFinite(video.duration) && video.currentTime < video.duration - 0.2) {
+                        video.currentTime = video.duration - 0.1;
+                    }
+                } else {
+                    if (video.playbackRate === 16) {
+                        video.playbackRate = 1;
+                    }
+                    if (wasAdActive) {
+                        video.muted = false;
+                        wasAdActive = false;
+                    }
+                    // Force-unmute on watch pages (defeats YouTube's own mute policy)
+                    var isWatch = window.location.pathname.indexOf('/watch') === 0;
+                    if (isWatch && video.muted && !video.paused) {
+                        video.muted = false;
                     }
                 }
                 
-                if (!isAd) {
-                    var adOverlay = document.querySelector('.ytp-ad-player-overlay, .ytp-ad-overlay-container, .ytp-ad-message-container');
-                    if (adOverlay && adOverlay.style.display !== 'none' && adOverlay.offsetHeight > 0) {
-                        isAd = true;
+                // Force low quality (144p) to save memory and CPU
+                if (typeof video.dataset.qualityForced === 'undefined') {
+                    var moviePlayer = document.getElementById('movie_player') || document.querySelector('.html5-video-player');
+                    if (moviePlayer) {
+                        if (typeof moviePlayer.setPlaybackQualityRange === 'function') {
+                            moviePlayer.setPlaybackQualityRange('tiny');
+                        }
+                        if (typeof moviePlayer.setPlaybackQuality === 'function') {
+                            moviePlayer.setPlaybackQuality('tiny');
+                        }
+                        video.dataset.qualityForced = 'true';
                     }
                 }
 
-                var video = document.querySelector('video');
-                if (video) {
-                    if (isAd) {
-                        // 1. Mute ad audio instantly
-                        if (!video.muted) {
-                            video.muted = true;
-                            wasAdActive = true;
-                        }
-                        // 2. Speed up playback to 16x
-                        video.playbackRate = 16;
-                        
-                        // 3. Skip instantly if button is present
-                        var skipBtn = document.querySelector('.ytp-ad-skip-button, .ytp-ad-skip-button-modern, .ytp-ad-skip-button-slot button, .ytp-ad-skip-button-slot, .ytp-ad-skip-button-container');
-                        if (skipBtn) {
-                            skipBtn.click();
-                        }
-                        
-                        // 4. Force-seek to end of the ad to bypass it instantly
-                        if (isFinite(video.duration) && video.currentTime < video.duration - 0.2) {
-                            video.currentTime = video.duration - 0.1;
-                        }
+                if (!video.playsInline) video.playsInline = true;
+                if (!video.disableRemotePlayback) video.disableRemotePlayback = true;
+
+                // Autoplay handler — only on watch pages, never on home/search
+                var isWatchPage = window.location.pathname.indexOf('/watch') === 0;
+                if (isWatchPage && window.__needsAutoplay && !isAd) {
+                    if (!video.paused) {
+                        window.__needsAutoplay = false;
                     } else {
-                        // Reset speed if it is stuck at 16x
-                        if (video.playbackRate === 16) {
-                            video.playbackRate = 1;
-                        }
-                        // Reset mute if it was muted by an ad
-                        if (wasAdActive) {
-                            video.muted = false;
-                            wasAdActive = false;
+                        var playBtn = document.querySelector('button.player-control-play, .player-play-button, .ytp-large-play-button, button[aria-label="Play"], button[aria-label="Play video"]');
+                        if (playBtn && playBtn.offsetHeight > 0) {
+                            playBtn.click();
+                            window.__needsAutoplay = false;
+                        } else {
+                            video.play().then(function() {
+                                window.__needsAutoplay = false;
+                            }).catch(function(e) {
+                                // Ignore autoplay block exceptions
+                            });
                         }
                     }
                 }
             }
 
-            optimizeVideo();
-            handleAds();
+            setInterval(globalUpdate, 250);
 
-            var observer = new MutationObserver(function() {
-                optimizeVideo();
-                handleAds();
+            // Flag autoplay only when navigating to a watch page
+            document.addEventListener('yt-navigate-finish', () => {
+                if (window.location.pathname.indexOf('/watch') === 0) {
+                    window.__needsAutoplay = true;
+                } else {
+                    window.__needsAutoplay = false;
+                }
+                // Reset quality forcing for new video
+                var v = document.querySelector('video');
+                if (v) delete v.dataset.qualityForced;
+                var evt = new MouseEvent('mousemove', { bubbles: true, cancelable: true, clientX: 100, clientY: 100 });
+                document.dispatchEvent(evt);
             });
-            observer.observe(document.documentElement, { childList: true, subtree: true });
-
-            // Periodic safety sweep
-            setInterval(optimizeVideo, 1200);
-            setInterval(handleAds, 250);
         })();
         """
         configuration.userContentController.addUserScript(
             WKUserScript(source: optimizationJS, injectionTime: .atDocumentEnd, forMainFrameOnly: false)
         )
         
-        webView = WKWebView(frame: NSRect(x: 0, y: 0, width: 375, height: 600), configuration: configuration)
+        webView = WKWebView(frame: NSRect(x: 0, y: 0, width: 375, height: 550), configuration: configuration)
         webView.navigationDelegate = self
         
         // Mobile Safari user agent → forces m.youtube.com lightweight layout
@@ -241,38 +349,28 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate, WKNavigat
         }
     }
     
-    // MARK: - Offscreen Window (keeps WebView alive when popover is closed)
+    // MARK: - Player Window Setup
     
-    private func setupOffscreenWindow() {
-        offscreenWindow = NSWindow(
-            contentRect: NSRect(x: -20000, y: -20000, width: 375, height: 600),
-            styleMask: [.borderless],
+    private func setupPlayerWindow() {
+        playerWindow = PlayerPanel(
+            contentRect: NSRect(x: -20000, y: -20000, width: 375, height: 550),
+            styleMask: [.borderless, .nonactivatingPanel],
             backing: .buffered,
             defer: false
         )
-        offscreenWindow.isReleasedWhenClosed = false
-        offscreenWindow.title = "YTAudioAirOffscreen"
+        playerWindow.isReleasedWhenClosed = false
+        playerWindow.title = "YT Audio Air"
+        playerWindow.level = .statusBar
+        playerWindow.hasShadow = true
+        playerWindow.backgroundColor = .clear
+        playerWindow.isOpaque = false
         
-        let container = NSView(frame: NSRect(x: 0, y: 0, width: 375, height: 600))
-        offscreenWindow.contentView = container
+        let hostingView = NSHostingView(rootView: ContentView())
+        hostingView.frame = NSRect(x: 0, y: 0, width: 375, height: 550)
+        hostingView.autoresizingMask = [.width, .height]
         
-        // Park WebView in offscreen window initially
-        webView.removeFromSuperview()
-        webView.frame = container.bounds
-        webView.autoresizingMask = [.width, .height]
-        webView.translatesAutoresizingMaskIntoConstraints = true
-        container.addSubview(webView)
-        
-        offscreenWindow.orderBack(nil)
-    }
-    
-    // MARK: - Popover Setup
-    
-    private func setupPopover() {
-        popover.contentSize = NSSize(width: 375, height: 550)
-        popover.behavior = .transient   // ← auto-closes when clicking outside
-        popover.delegate = self
-        popover.contentViewController = NSHostingController(rootView: ContentView())
+        playerWindow.contentView = hostingView
+        playerWindow.orderBack(nil)
     }
     
     // MARK: - Status Item (Menu Bar Icon)
@@ -299,14 +397,83 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate, WKNavigat
         }
     }
     
+    var isWindowVisible: Bool {
+        return playerWindow != nil && playerWindow.frame.origin.x > -10000
+    }
+    
     @objc func togglePopover() {
         guard let button = statusItem?.button else { return }
         
-        if popover.isShown {
-            popover.performClose(nil)
+        if isWindowVisible {
+            hideWindow()
         } else {
-            popover.show(relativeTo: button.bounds, of: button, preferredEdge: .minY)
-            NSApp.activate(ignoringOtherApps: true)
+            showWindow(relativeTo: button)
+        }
+    }
+    
+    func showWindow(relativeTo button: NSButton) {
+        guard let buttonWindow = button.window else { return }
+        
+        let buttonFrameInWindow = button.convert(button.bounds, to: nil)
+        let buttonFrameInScreen = buttonWindow.convertToScreen(buttonFrameInWindow)
+        
+        let windowWidth: CGFloat = 375
+        let windowHeight: CGFloat = 550
+        
+        let x = buttonFrameInScreen.origin.x + (buttonFrameInScreen.width / 2) - (windowWidth / 2)
+        let y = buttonFrameInScreen.origin.y - windowHeight - 4
+        
+        playerWindow.setFrame(NSRect(x: x, y: y, width: windowWidth, height: windowHeight), display: true)
+        playerWindow.makeKeyAndOrderFront(nil)
+        NSApp.activate(ignoringOtherApps: true)
+        
+        startMonitoringEvents()
+    }
+    
+    func hideWindow() {
+        playerWindow.setFrame(NSRect(x: -20000, y: -20000, width: 375, height: 550), display: true)
+        stopMonitoringEvents()
+    }
+    
+    // MARK: - Click Outside Monitoring
+    
+    private func startMonitoringEvents() {
+        stopMonitoringEvents()
+        
+        localEventMonitor = NSEvent.addLocalMonitorForEvents(matching: [.leftMouseDown, .rightMouseDown]) { [weak self] event in
+            guard let self = self else { return event }
+            let mouseLocation = NSEvent.mouseLocation
+            if !self.playerWindow.frame.contains(mouseLocation) {
+                if let button = self.statusItem?.button, button.window?.frame.contains(mouseLocation) == true {
+                    // Let status bar action handle it
+                    return event
+                }
+                self.hideWindow()
+            }
+            return event
+        }
+        
+        globalEventMonitor = NSEvent.addGlobalMonitorForEvents(matching: [.leftMouseDown, .rightMouseDown]) { [weak self] event in
+            guard let self = self else { return }
+            let mouseLocation = NSEvent.mouseLocation
+            if self.playerWindow.frame.contains(mouseLocation) {
+                return
+            }
+            if let button = self.statusItem?.button, button.window?.frame.contains(mouseLocation) == true {
+                return
+            }
+            self.hideWindow()
+        }
+    }
+    
+    private func stopMonitoringEvents() {
+        if let monitor = localEventMonitor {
+            NSEvent.removeMonitor(monitor)
+            localEventMonitor = nil
+        }
+        if let monitor = globalEventMonitor {
+            NSEvent.removeMonitor(monitor)
+            globalEventMonitor = nil
         }
     }
     
@@ -319,7 +486,7 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate, WKNavigat
         
         // Toggle Player
         let toggleItem = NSMenuItem(
-            title: popover.isShown ? "Hide Player" : "Show Player",
+            title: isWindowVisible ? "Hide Player" : "Show Player",
             action: #selector(menuTogglePlayer),
             keyEquivalent: "t"
         )
@@ -333,10 +500,15 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate, WKNavigat
         homeItem.target = self
         menu.addItem(homeItem)
         
-        // Clear Cache
-        let clearItem = NSMenuItem(title: "Clear Cache & Sign Out", action: #selector(menuClearCache), keyEquivalent: "c")
-        clearItem.target = self
-        menu.addItem(clearItem)
+        // Clear Cache Only
+        let clearCacheItem = NSMenuItem(title: "Clear Cache Only", action: #selector(menuClearCacheOnly), keyEquivalent: "c")
+        clearCacheItem.target = self
+        menu.addItem(clearCacheItem)
+        
+        // Sign Out & Clear All Data
+        let signOutItem = NSMenuItem(title: "Sign Out & Clear All Data", action: #selector(menuSignOut), keyEquivalent: "s")
+        signOutItem.target = self
+        menu.addItem(signOutItem)
         
         menu.addItem(NSMenuItem.separator())
         
@@ -369,11 +541,31 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate, WKNavigat
         }
     }
     
-    @objc private func menuClearCache() {
+    @objc private func menuClearCacheOnly() {
         let alert = NSAlert()
-        alert.messageText = "Clear Cache & Sign Out"
-        alert.informativeText = "This will remove all saved cookies and sign you out of YouTube. Continue?"
-        alert.addButton(withTitle: "Clear")
+        alert.messageText = "Clear Cache Only"
+        alert.informativeText = "This will remove cached files to free up disk and memory space. You will remain signed in. Continue?"
+        alert.addButton(withTitle: "Clear Cache")
+        alert.addButton(withTitle: "Cancel")
+        alert.alertStyle = .informational
+        
+        if alert.runModal() == .alertFirstButtonReturn {
+            let dataTypes: Set<String> = [
+                WKWebsiteDataTypeDiskCache,
+                WKWebsiteDataTypeMemoryCache,
+                WKWebsiteDataTypeOfflineWebApplicationCache
+            ]
+            WKWebsiteDataStore.default().removeData(ofTypes: dataTypes, modifiedSince: Date(timeIntervalSince1970: 0)) {
+                self.webView.reload()
+            }
+        }
+    }
+    
+    @objc private func menuSignOut() {
+        let alert = NSAlert()
+        alert.messageText = "Sign Out & Clear All Data"
+        alert.informativeText = "This will remove all saved cookies, cache, and sign you out of YouTube. Continue?"
+        alert.addButton(withTitle: "Sign Out")
         alert.addButton(withTitle: "Cancel")
         alert.alertStyle = .warning
         
@@ -398,43 +590,6 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate, WKNavigat
             options: [.userInitiated, .idleSystemSleepDisabled, .suddenTerminationDisabled, .automaticTerminationDisabled],
             reason: "YT Audio Air — background audio playback"
         )
-    }
-    
-    // MARK: - Offscreen Parking Helpers
-    
-    func parkWebViewOffscreen() {
-        DispatchQueue.main.async { [weak self] in
-            guard let self = self, let container = self.offscreenWindow.contentView else { return }
-            if self.webView.superview != container {
-                self.webView.removeFromSuperview()
-                self.webView.frame = container.bounds
-                self.webView.autoresizingMask = [.width, .height]
-                self.webView.translatesAutoresizingMaskIntoConstraints = true
-                container.addSubview(self.webView)
-            }
-        }
-    }
-    
-    func retrieveWebViewFromOffscreen() {
-        DispatchQueue.main.async { [weak self] in
-            guard let self = self else { return }
-            if self.webView.superview == self.offscreenWindow.contentView {
-                self.webView.removeFromSuperview()
-            }
-        }
-    }
-    
-    // MARK: - NSPopoverDelegate
-    
-    func popoverWillShow(_ notification: Notification) {
-        // Managed dynamically via SwiftUI onAppear visibility
-    }
-    
-    func popoverDidClose(_ notification: Notification) {
-        // Safety fallback to ensure webView is never left without a parent in memory
-        if webView.superview == nil {
-            parkWebViewOffscreen()
-        }
     }
     
     // MARK: - WKNavigationDelegate
