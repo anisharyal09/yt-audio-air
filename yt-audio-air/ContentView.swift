@@ -2,8 +2,6 @@
 //  ContentView.swift
 //  yt-audio-air
 //
-//  Created by Anish Aryal on 15/06/2026.
-//
 
 import SwiftUI
 import WebKit
@@ -15,32 +13,142 @@ struct ContentView: View {
     @State private var canGoForward = false
     @State private var isLoading = false
     @State private var pageTitle = "YT Audio Air"
+    @State private var showOptions = false
+    
+    @AppStorage("hideImages") private var hideImages = false
+    @AppStorage("grayscale") private var grayscale = false
     
     var body: some View {
-        VStack(spacing: 0) {
-            // ── Premium Header ──
-            HeaderView(
-                canGoBack: $canGoBack,
-                canGoForward: $canGoForward,
-                isLoading: $isLoading,
-                pageTitle: $pageTitle
+        ZStack {
+            VStack(spacing: 0) {
+                // ── Premium Header ──
+                HeaderView(
+                    canGoBack: $canGoBack,
+                    canGoForward: $canGoForward,
+                    isLoading: $isLoading,
+                    pageTitle: $pageTitle,
+                    showOptions: $showOptions
+                )
+                
+                // ── WebView ──
+                WebViewContainer()
+                    .frame(width: 375, height: 480)
+                
+                // ── Footer ──
+                FooterView()
+            }
+            .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
+            .background(
+                VisualEffectView(material: .hudWindow, blendingMode: .behindWindow)
+                    .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
             )
             
-            // ── WebView ──
-            WebViewContainer()
-                .frame(width: 375, height: 480)
-            
-            // ── Footer ──
-            FooterView()
+            // ── Centered Glassmorphic Options Popup ──
+            if showOptions {
+                // Background dark overlay
+                Color.black.opacity(0.4)
+                    .edgesIgnoringSafeArea(.all)
+                    .onTapGesture {
+                        withAnimation(.spring(response: 0.3, dampingFraction: 0.75)) {
+                            showOptions = false
+                        }
+                    }
+                    .transition(.opacity)
+                
+                VStack(spacing: 14) {
+                    HStack {
+                        Text("Options")
+                            .font(.system(size: 13, weight: .bold, design: .rounded))
+                            .foregroundColor(.white)
+                        Spacer()
+                        Button(action: {
+                            withAnimation(.spring(response: 0.3, dampingFraction: 0.75)) {
+                                showOptions = false
+                            }
+                        }) {
+                            Image(systemName: "xmark.circle.fill")
+                                .font(.system(size: 14))
+                                .foregroundColor(.white.opacity(0.4))
+                        }
+                        .buttonStyle(.plain)
+                    }
+                    
+                    Divider()
+                        .background(Color.white.opacity(0.1))
+                    
+                    VStack(alignment: .leading, spacing: 14) {
+                        HStack {
+                            VStack(alignment: .leading, spacing: 2) {
+                                Text("Hide Images from Feed")
+                                    .font(.system(size: 11.5, weight: .medium, design: .rounded))
+                                    .foregroundColor(.white.opacity(0.85))
+                                Text("(also hides channel profile pictures)")
+                                    .font(.system(size: 9, weight: .regular, design: .rounded))
+                                    .foregroundColor(.white.opacity(0.45))
+                            }
+                            Spacer()
+                            Toggle("", isOn: $hideImages)
+                                .toggleStyle(.switch)
+                                .labelsHidden()
+                        }
+                        
+                        HStack {
+                            Text("Grayscale Mode")
+                                .font(.system(size: 11.5, weight: .medium, design: .rounded))
+                                .foregroundColor(.white.opacity(0.85))
+                            Spacer()
+                            Toggle("", isOn: $grayscale)
+                                .toggleStyle(.switch)
+                                .labelsHidden()
+                        }
+                        
+                        Button(action: {
+                            if let url = URL(string: "https://m.youtube.com") {
+                                AppDelegate.shared?.webView.load(URLRequest(url: url))
+                            }
+                            withAnimation(.spring(response: 0.3, dampingFraction: 0.75)) {
+                                showOptions = false
+                            }
+                        }) {
+                            HStack {
+                                Image(systemName: "house.fill")
+                                    .font(.system(size: 10))
+                                Text("Go to Home Feed")
+                                    .font(.system(size: 11, weight: .semibold, design: .rounded))
+                            }
+                            .foregroundColor(.white)
+                            .frame(maxWidth: .infinity)
+                            .padding(.vertical, 7)
+                            .background(
+                                RoundedRectangle(cornerRadius: 8, style: .continuous)
+                                    .fill(Color.white.opacity(0.1))
+                            )
+                        }
+                        .buttonStyle(.plain)
+                    }
+                }
+                .padding(16)
+                .frame(width: 250)
+                .background(
+                    VisualEffectView(material: .hudWindow, blendingMode: .withinWindow)
+                        .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
+                )
+                .overlay(
+                    RoundedRectangle(cornerRadius: 16, style: .continuous)
+                        .stroke(Color.white.opacity(0.08), lineWidth: 1)
+                )
+                .shadow(color: Color.black.opacity(0.4), radius: 16, x: 0, y: 8)
+                .transition(.scale(scale: 0.92).combined(with: .opacity))
+            }
         }
-        .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
-        .background(
-            VisualEffectView(material: .hudWindow, blendingMode: .behindWindow)
-                .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
-        )
         .preferredColorScheme(.dark)
         .onAppear {
             startNavigationPolling()
+        }
+        .onReceive(NotificationCenter.default.publisher(for: Notification.Name("ShowOptions"))) { _ in
+            withAnimation(.spring(response: 0.3, dampingFraction: 0.75)) {
+                showOptions = true
+            }
         }
     }
     
@@ -51,6 +159,10 @@ struct ContentView: View {
             canGoForward = wv.canGoForward
             isLoading = wv.isLoading
             pageTitle = wv.title ?? "YT Audio Air"
+            
+            let hide = UserDefaults.standard.bool(forKey: "hideImages")
+            let gray = UserDefaults.standard.bool(forKey: "grayscale")
+            wv.evaluateJavaScript("window.__hideImages = \(hide); window.__grayscale = \(gray);", completionHandler: nil)
         }
     }
 }
@@ -62,6 +174,7 @@ struct HeaderView: View {
     @Binding var canGoForward: Bool
     @Binding var isLoading: Bool
     @Binding var pageTitle: String
+    @Binding var showOptions: Bool
     @State private var hoverBtn: Int? = nil
     
     var body: some View {
@@ -69,25 +182,11 @@ struct HeaderView: View {
             HStack(spacing: 0) {
                 // Brand
                 HStack(spacing: 7) {
-                    // Animated waveform icon
-                    ZStack {
-                        Circle()
-                            .fill(
-                                LinearGradient(
-                                    colors: [
-                                        Color(red: 1.0, green: 0.22, blue: 0.22),
-                                        Color(red: 1.0, green: 0.45, blue: 0.15)
-                                    ],
-                                    startPoint: .topLeading,
-                                    endPoint: .bottomTrailing
-                                )
-                            )
-                            .frame(width: 26, height: 26)
-                        
-                        Image(systemName: "waveform")
-                            .font(.system(size: 11, weight: .bold))
-                            .foregroundColor(.white)
-                    }
+                    Image("AppIconImage")
+                        .resizable()
+                        .aspectRatio(contentMode: .fit)
+                        .frame(width: 30, height: 30)
+                        .clipShape(RoundedRectangle(cornerRadius: 7, style: .continuous))
                     
                     VStack(alignment: .leading, spacing: 1) {
                         Text("YT Audio Air")
@@ -121,9 +220,24 @@ struct HeaderView: View {
                     navButton(icon: "arrow.clockwise", index: 2, enabled: true) {
                         AppDelegate.shared?.webView.reload()
                     }
-                    navButton(icon: "house.fill", index: 3, enabled: true) {
-                        if let url = URL(string: "https://m.youtube.com") {
-                            AppDelegate.shared?.webView.load(URLRequest(url: url))
+                    Button(action: {
+                        withAnimation(.spring(response: 0.3, dampingFraction: 0.75)) {
+                            showOptions.toggle()
+                        }
+                    }) {
+                        Image(systemName: "slider.horizontal.3")
+                            .font(.system(size: 10, weight: .semibold))
+                            .foregroundColor(.white)
+                            .frame(width: 28, height: 28)
+                            .background(
+                                RoundedRectangle(cornerRadius: 8, style: .continuous)
+                                    .fill(hoverBtn == 3 ? Color.white.opacity(0.15) : Color.white.opacity(0.07))
+                            )
+                    }
+                    .buttonStyle(.plain)
+                    .onHover { hovering in
+                        withAnimation(.spring(response: 0.2, dampingFraction: 0.65)) {
+                            hoverBtn = hovering ? 3 : nil
                         }
                     }
                 }
@@ -197,6 +311,7 @@ struct HeaderView: View {
 struct FooterView: View {
     @State private var hoverGH = false
     @State private var hoverKofi = false
+    @State private var hoverVersion = false
     
     var body: some View {
         VStack(spacing: 0) {
@@ -213,7 +328,7 @@ struct FooterView: View {
                 }) {
                     Image(systemName: "chevron.left.forwardslash.chevron.right")
                         .font(.system(size: 10, weight: .semibold))
-                        .foregroundColor(hoverGH ? .white : .white.opacity(0.35))
+                        .foregroundColor(hoverGH ? .white.opacity(0.6) : .white.opacity(0.18))
                         .frame(width: 22, height: 22)
                         .background(
                             Circle()
@@ -229,20 +344,32 @@ struct FooterView: View {
                 Spacer()
                 
                 // Version (middle)
-                Text("v1.1.0")
-                    .font(.system(size: 8.5, weight: .semibold, design: .monospaced))
-                    .foregroundColor(.white.opacity(0.18))
+                Button(action: {
+                    if let url = URL(string: "https://github.com/anisharyal09/yt-audio-air/blob/main/updates.md") {
+                        NSWorkspace.shared.open(url)
+                    }
+                }) {
+                    Text("v1.2.0")
+                        .font(.system(size: 8.5, weight: .semibold, design: .monospaced))
+                        .foregroundColor(hoverVersion ? .white.opacity(0.6) : .white.opacity(0.18))
+                }
+                .buttonStyle(.plain)
+                .onHover { h in
+                    withAnimation(.easeOut(duration: 0.15)) { hoverVersion = h }
+                }
+                .help("See changelogs (what's new)")
                 
                 Spacer()
                 
-                // Ko-fi icon (right)
+                // Support icon (right)
                 Button(action: {
-                    if let url = URL(string: "https://ko-fi.com/anisharyal09") {
+                    if let url = URL(string: "https://anisharyal09.com.np/support?from=yt-audio-air") {
                         NSWorkspace.shared.open(url)
                     }
                 }) {
                     Text("☕")
                         .font(.system(size: 11))
+                        .opacity(hoverKofi ? 0.85 : 0.35)
                         .frame(width: 22, height: 22)
                         .background(
                             Circle()
@@ -253,7 +380,7 @@ struct FooterView: View {
                 .onHover { h in
                     withAnimation(.easeOut(duration: 0.15)) { hoverKofi = h }
                 }
-                .help("Support on Ko-fi")
+                .help("Support Me")
             }
             .padding(.horizontal, 12)
             .padding(.vertical, 2)

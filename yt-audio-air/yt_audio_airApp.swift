@@ -2,8 +2,6 @@
 //  yt_audio_airApp.swift
 //  yt-audio-air
 //
-//  Created by Anish Aryal on 15/06/2026.
-//
 
 import SwiftUI
 import AppKit
@@ -191,7 +189,9 @@ class AppDelegate: NSObject, NSApplicationDelegate, WKNavigationDelegate {
                 ytm-item-section-renderer[section-identifier="related-items"],
                 /* Hide Shorts, Subscriptions, and You */
                 ytm-pivot-bar-renderer-content[pivot-bar-item-id="pivot-shorts"],
-                ytm-reel-shelf-renderer {
+                ytm-reel-shelf-renderer,
+                /* Hide Tap to Unmute Overlay */
+                .ytp-unmute, .ytp-unmute-box, .ytp-unmute-text, .ytm-unmute-box, .ytm-unmute-text, [class*="unmute-box"], [class*="unmute-button"] {
                     display: none !important;
                     height: 0 !important;
                     max-height: 0 !important;
@@ -237,45 +237,87 @@ class AppDelegate: NSObject, NSApplicationDelegate, WKNavigationDelegate {
             var wasAdActive = false;
 
             function globalUpdate() {
-                var video = document.querySelector('video');
-                if (!video) return;
+                // Check if images need to be hidden/restored
+                var hideImages = window.__hideImages === true;
+                var imgStyle = document.getElementById('yt-audio-air-hide-images');
+                if (hideImages) {
+                    if (!imgStyle) {
+                        imgStyle = document.createElement('style');
+                        imgStyle.id = 'yt-audio-air-hide-images';
+                        imgStyle.textContent = 'img, lazy-image, .ytp-cued-thumbnail-overlay { opacity: 0 !important; } .ytm-thumbnail-canvas, .thumbnail, .media-item-thumbnail-container { background: #1c1c1e !important; border-radius: 8px !important; }';
+                        document.documentElement.appendChild(imgStyle);
+                    }
+                } else {
+                    if (imgStyle) {
+                        imgStyle.remove();
+                    }
+                }
 
-                var player = document.querySelector('.html5-video-player, .player-container, #player');
+                // Check if grayscale needs to be applied/removed
+                var grayscale = window.__grayscale === true;
+                var grayStyle = document.getElementById('yt-audio-air-grayscale');
+                if (grayscale) {
+                    if (!grayStyle) {
+                        grayStyle = document.createElement('style');
+                        grayStyle.id = 'yt-audio-air-grayscale';
+                        grayStyle.textContent = 'html { filter: grayscale(100%) !important; } ytm-header-bar, .ytm-header-bar, ytm-mobile-topbar-renderer { will-change: transform !important; }';
+                        document.documentElement.appendChild(grayStyle);
+                    }
+                } else {
+                    if (grayStyle) {
+                        grayStyle.remove();
+                    }
+                }
+
+                var videos = document.querySelectorAll('video');
+                if (videos.length === 0) return;
+                var video = videos[0]; // Primary video for quality/autoplay controls
+
                 var isAd = false;
-                
-                if (player && (player.classList.contains('ad-showing') || player.classList.contains('ad-interrupting'))) {
+                if (document.querySelector('.ad-showing, .ad-interrupting') !== null) {
+                    isAd = true;
+                }
+                var adOverlay = document.querySelector('.ytp-ad-player-overlay, .ytp-ad-overlay-container, .ytm-ad-overlay-renderer');
+                if (adOverlay && adOverlay.offsetHeight > 0) {
+                    isAd = true;
+                }
+                var skipBtn = document.querySelector('.ytp-ad-skip-button, .ytp-ad-skip-button-modern, .ytp-ad-skip-button-slot button, .ytp-ad-skip-button-slot, .ytp-ad-skip-button-container, .ytp-ad-skip-button-container button, .ytm-biz-skip-ad-button');
+                if (skipBtn && skipBtn.offsetHeight > 0) {
                     isAd = true;
                 }
 
                 if (isAd) {
-                    if (!video.muted) {
-                        video.muted = true;
-                        wasAdActive = true;
-                    }
-                    if (video.playbackRate !== 16) {
-                        video.playbackRate = 16;
-                    }
-                    
-                    var skipBtn = document.querySelector('.ytp-ad-skip-button, .ytp-ad-skip-button-modern, .ytp-ad-skip-button-slot button, .ytp-ad-skip-button-slot, .ytp-ad-skip-button-container, .ytp-ad-skip-button-container button, .ytm-biz-skip-ad-button');
+                    videos.forEach(function(v) {
+                        if (!v.muted) {
+                            v.muted = true;
+                            wasAdActive = true;
+                        }
+                        if (v.playbackRate !== 16) {
+                            v.playbackRate = 16;
+                        }
+                        if (isFinite(v.duration) && v.currentTime < v.duration - 0.2) {
+                            v.currentTime = v.duration - 0.1;
+                        }
+                    });
                     if (skipBtn && skipBtn.offsetHeight > 0) {
                         skipBtn.click();
                     }
-                    
-                    if (isFinite(video.duration) && video.currentTime < video.duration - 0.2) {
-                        video.currentTime = video.duration - 0.1;
-                    }
                 } else {
-                    if (video.playbackRate === 16) {
-                        video.playbackRate = 1;
-                    }
+                    videos.forEach(function(v) {
+                        if (v.playbackRate === 16) {
+                            v.playbackRate = 1;
+                        }
+                        if (wasAdActive) {
+                            v.muted = false;
+                        }
+                        // Force-unmute on watch pages (defeats YouTube's own mute policy)
+                        var isWatch = window.location.pathname.indexOf('/watch') === 0;
+                        if (isWatch && v.muted && !v.paused) {
+                            v.muted = false;
+                        }
+                    });
                     if (wasAdActive) {
-                        video.muted = false;
                         wasAdActive = false;
-                    }
-                    // Force-unmute on watch pages (defeats YouTube's own mute policy)
-                    var isWatch = window.location.pathname.indexOf('/watch') === 0;
-                    if (isWatch && video.muted && !video.paused) {
-                        video.muted = false;
                     }
                 }
                 
@@ -493,6 +535,15 @@ class AppDelegate: NSObject, NSApplicationDelegate, WKNavigationDelegate {
         toggleItem.target = self
         menu.addItem(toggleItem)
         
+        // Options Panel
+        let optionsItem = NSMenuItem(
+            title: "Options…",
+            action: #selector(menuShowOptions),
+            keyEquivalent: ","
+        )
+        optionsItem.target = self
+        menu.addItem(optionsItem)
+        
         menu.addItem(NSMenuItem.separator())
         
         // Go Home
@@ -535,6 +586,14 @@ class AppDelegate: NSObject, NSApplicationDelegate, WKNavigationDelegate {
         togglePopover()
     }
     
+    @objc private func menuShowOptions() {
+        if !isWindowVisible {
+            guard let button = statusItem?.button else { return }
+            showWindow(relativeTo: button)
+        }
+        NotificationCenter.default.post(name: Notification.Name("ShowOptions"), object: nil)
+    }
+    
     @objc private func menuGoHome() {
         if let url = URL(string: "https://m.youtube.com") {
             webView.load(URLRequest(url: url))
@@ -543,6 +602,7 @@ class AppDelegate: NSObject, NSApplicationDelegate, WKNavigationDelegate {
     
     @objc private func menuClearCacheOnly() {
         let alert = NSAlert()
+        alert.icon = NSImage(named: "AppIconImage")
         alert.messageText = "Clear Cache Only"
         alert.informativeText = "This will remove cached files to free up disk and memory space. You will remain signed in. Continue?"
         alert.addButton(withTitle: "Clear Cache")
@@ -552,8 +612,7 @@ class AppDelegate: NSObject, NSApplicationDelegate, WKNavigationDelegate {
         if alert.runModal() == .alertFirstButtonReturn {
             let dataTypes: Set<String> = [
                 WKWebsiteDataTypeDiskCache,
-                WKWebsiteDataTypeMemoryCache,
-                WKWebsiteDataTypeOfflineWebApplicationCache
+                WKWebsiteDataTypeMemoryCache
             ]
             WKWebsiteDataStore.default().removeData(ofTypes: dataTypes, modifiedSince: Date(timeIntervalSince1970: 0)) {
                 self.webView.reload()
@@ -563,6 +622,7 @@ class AppDelegate: NSObject, NSApplicationDelegate, WKNavigationDelegate {
     
     @objc private func menuSignOut() {
         let alert = NSAlert()
+        alert.icon = NSImage(named: "AppIconImage")
         alert.messageText = "Sign Out & Clear All Data"
         alert.informativeText = "This will remove all saved cookies, cache, and sign you out of YouTube. Continue?"
         alert.addButton(withTitle: "Sign Out")
@@ -578,7 +638,7 @@ class AppDelegate: NSObject, NSApplicationDelegate, WKNavigationDelegate {
     }
     
     @objc private func menuSupport() {
-        if let url = URL(string: "https://ko-fi.com/anisharyal09") {
+        if let url = URL(string: "https://anisharyal09.com.np/support?from=yt-audio-air") {
             NSWorkspace.shared.open(url)
         }
     }

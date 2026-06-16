@@ -2,7 +2,7 @@
 
 <p align="center">
   <img src="https://img.shields.io/badge/Platform-macOS%2014.0+-blue?style=for-the-badge&logo=apple" alt="Platform: macOS 14.0+" />
-  <a href="updates.md"><img src="https://img.shields.io/badge/App-v1.1.0-green?style=for-the-badge" alt="App Version: v1.1.0" /></a>
+  <a href="updates.md"><img src="https://img.shields.io/badge/App-v1.2.0-green?style=for-the-badge" alt="App Version: v1.2.0" /></a>
   <img src="https://img.shields.io/badge/Built%20with-Swift%205%20%2B%20WKWebView-orange?style=for-the-badge&logo=swift" alt="Built with Swift 5 + WKWebView" />
 </p>
 
@@ -38,7 +38,10 @@ This project was built using Xcode and Swift, with developer assistance from:
 - **Minimal Resource Usage** — Video element deflated to 1×1px. Quality forced to 144p. GPU raster bypassed. No MutationObservers — single 250ms polling loop handles everything.
 - **Locked-Down Watch Page** — Descriptions, comments, like/share buttons, engagement panels, related videos, and Shorts are all hidden. Only the player and playlist queue are visible.
 - **Auto-Unmute** — Defeats YouTube mobile's autoplay muting by continuously forcing `video.muted = false` on watch pages.
-- **Navigation Bar** — Back, Forward, Refresh, Home buttons with spring animations. Shows current video title and loading progress.
+- **Hide Images & Avatars** — Toggle to visually hide all video thumbnails and channel profile pictures. Uses non-collapsing styling to preserve card grid alignment and keep video duration overlays fully visible.
+- **Grayscale Mode** — Native-performance grayscale filter option for the entire interface, hardware layer composited (`will-change: transform`) to prevent WebKit animation or sticky-scroll glitches.
+- **Settings Control Popover** — A glassmorphic options card to toggle preferences (Hide Images, Grayscale, Go to Home) with clean right-aligned switches.
+- **Navigation Bar** — Back, Forward, Refresh, settings controls, and a high-resolution brand logo.
 - **Right-Click Menu** — Toggle player, go home, clear cache (stay signed in), sign out & clear all data, support link, quit.
 - **Privacy** — 100% client-side. No trackers, no telemetry, no third-party servers. Cookies stored in macOS's sandboxed WebKit container.
 
