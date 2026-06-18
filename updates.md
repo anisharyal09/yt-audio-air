@@ -3,6 +3,7 @@
 All notable changes to this project will be documented in this file.
 
 ## [v1.2.0] - 2026-06-16
+(updated 2026-06-18)
 
 ### Added
 - **Grayscale Mode Option** — Added a native-performance grayscale preference switch in the options menu to render the whole web interface in grayscale.
@@ -11,6 +12,7 @@ All notable changes to this project will be documented in this file.
 - **Custom Header Brand Logo** — Integrated the newly generated neon waveform app icon image into the popover's top-left brand header for a premium and cohesive design.
 - **Add Alert Icons** — Added the high-resolution app icon to cache-clear and sign-out confirmation alerts, replacing blank/generic boxes.
 - **Clarifying Toggle Subtitle** — Added a helper description `(also hides channel profile pictures)` to the "Hide Images" toggle switch for better guidance.
+- **Open Source License & Security Policy** — Added the Apache License 2.0, file headers to Swift source files, and a project security policy file (`SECURITY.md`).
 
 ### Fixed
 - **Grayscale Scroll Interaction** — Fixed a WebKit rendering bug that stopped the header from sliding back down on scroll-up by forcing GPU layer compositing (`will-change: transform`) on mobile header elements.
@@ -51,7 +53,7 @@ All notable changes to this project will be documented in this file.
 
 ---
 
-## [v1.0.0] - 2026-06-15
+## [v1.0.0] - 2026-06-14/15
 
 ### Added
 - **Initial release** — Native macOS menu bar utility using Swift + WKWebView.
