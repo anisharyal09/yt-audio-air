@@ -3,9 +3,10 @@
 All notable changes to this project will be documented in this file.
 
 ## [v1.2.0] - 2026-06-16
-(updated 2026-06-18)
+(updated 2026-06-19)
 
 ### Added
+- **Homebrew Tap Installation** — Added support for installing the app via a custom Homebrew tap (`brew install anisharyal09/tap/yaa` or `yt-audio-air`), which automatically bypasses macOS Gatekeeper quarantine.
 - **Grayscale Mode Option** — Added a native-performance grayscale preference switch in the options menu to render the whole web interface in grayscale.
 - **Global Thumbnail Toggle** — Added a checkbox option in the popover header controls menu (`slider.horizontal.3`) to toggle hiding/showing all thumbnail images across all pages (Home, Search, and Watch), saving bandwidth, memory, and keeping it purely audio-oriented.
 - **Menu Bar Options Action** — Added an "Options…" action item to the right-click status menu (shortcut `⌘,`) to open the control options panel directly.

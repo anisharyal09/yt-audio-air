@@ -81,18 +81,41 @@ A single `setInterval(globalUpdate, 250)` replaces heavy DOM observers. Each tic
 
 ## Download & Installation
 
-### Pre-built Release (Recommended)
+### Option 1: Via Homebrew Tap (Recommended 🚀)
+
+Installing via the custom Homebrew Tap is the recommended method because it **automatically bypasses macOS Gatekeeper**. The tap's postflight installation script strips the quarantine attributes (`xattr -cr`), meaning you do **not** need to manually override security permissions ("Open Anyway") or right-click to run the app.
+
+To install, simply run:
+
+```bash
+brew install anisharyal09/tap/yaa
+```
+
+*Or, if you prefer using the full name:*
+
+```bash
+brew install anisharyal09/tap/yt-audio-air
+```
+---
+
+### Option 2: Pre-built Release (Manual)
+
+If you prefer not to use Homebrew:
+
 1. Go to the [Releases](https://github.com/anisharyal09/yt-audio-air/releases) page on GitHub.
 2. Download the latest `yt-audio-air.zip` from the release assets.
 3. Double-click to extract the ZIP archive, yielding the `yt-audio-air.app` bundle.
 4. Drag and drop the app into your `/Applications` directory.
 
-### First Launch (Bypassing macOS Gatekeeper)
-Because the app is compiled and released without an Apple Developer signature, macOS will initially block it with an "unidentified developer" warning.
+#### First Launch (Bypassing macOS Gatekeeper Manually)
+Because the pre-built ZIP release is compiled and released without an Apple Developer signature, macOS will block it on the first launch.
 To allow the app to run:
-1. **Right-click (or Control-click)** on `yt-audio-air.app` in Finder and select **Open**.
-2. Click the **Open** button in the pop-up warning dialog.
-3. Once bypassed, the app will run and show its custom neon waveform brand icon in the system menu bar.
+1. Double-click `yt-audio-air.app` to attempt to run it. macOS will show a warning dialog and block it. Click **Cancel** (or **OK**).
+2. Open **System Settings** on your Mac and navigate to **Privacy & Security**.
+3. Scroll down to the **Security** section. You will see a message stating ***"yt-audio-air.app" was blocked from use because it is not from an identified developer***.
+4. Click **Open Anyway** (you may need to enter your Mac's password or use Touch ID).
+5. Attempt to open `yt-audio-air.app` once more, and click **Open** on the confirmation dialog.
+6. Once completed, the app will launch and it will appear in menu bar.
 
 ---
 
