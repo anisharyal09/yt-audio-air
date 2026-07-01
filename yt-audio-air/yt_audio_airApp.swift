@@ -57,6 +57,16 @@ class AppDelegate: NSObject, NSApplicationDelegate, WKNavigationDelegate {
     func applicationDidFinishLaunching(_ notification: Notification) {
         AppDelegate.shared = self
         
+        UserDefaults.standard.register(defaults: [
+            "hideImages": false,
+            "grayscale": false,
+            "hideHomeFeed": true,
+            "hideShorts": true,
+            "hideSubscriptions": true,
+            "premiumUser": false,
+            "loopPlayback": false
+        ])
+        
         // Ensure the app runs as an accessory (hides from Dock)
         NSApp.setActivationPolicy(.accessory)
         
@@ -96,6 +106,15 @@ class AppDelegate: NSObject, NSApplicationDelegate, WKNavigationDelegate {
                 e.stopImmediatePropagation();
             }, true);
             document.dispatchEvent(new Event('visibilitychange'));
+
+            // Early path detection for SPA routing
+            var pathname = window.location.pathname;
+            var isHome = pathname === '/' || pathname === '';
+            var isSub = pathname.startsWith('/feed/subscriptions');
+            var isWatch = pathname.startsWith('/watch');
+            document.documentElement.setAttribute('data-ytv-home', isHome ? 'true' : 'false');
+            document.documentElement.setAttribute('data-ytv-sub', isSub ? 'true' : 'false');
+            document.documentElement.setAttribute('data-ytv-watch', isWatch ? 'true' : 'false');
         })();
         """
         configuration.userContentController.addUserScript(
@@ -173,16 +192,10 @@ class AppDelegate: NSObject, NSApplicationDelegate, WKNavigationDelegate {
                 ytm-live-chat-renderer, #chat, iframe[src*="live_chat"],
                 ytm-comment-section-renderer, ytm-comments-entry-point-header-renderer,
                 #comment-section, .comment-section-renderer,
-                /* Video description & info sections */
-                ytm-video-description-header-renderer,
-                ytm-video-description-music-section-renderer,
-                ytm-slim-video-metadata-section-renderer .collapsed-content,
-                ytm-slim-video-metadata-section-renderer .smart-button-container,
-                ytm-slim-video-metadata-section-renderer .slim-video-metadata-actions,
-                ytm-engagement-panel-section-list-renderer,
-                .ytm-video-description-renderer,
                 /* Like/dislike/share/save buttons */
                 ytm-slim-video-action-bar-renderer,
+                /* Related recommendations grid on watch page */
+                ytm-item-section-renderer[section-identifier="related-items"],
                 /* Ads & Promotions (excl .ad-showing to avoid freezing player) */
                 .companion-ad, #masthead-ad, ytm-companion-ad-renderer,
                 .ad-container, .promoted-item, ytm-promoted-item,
@@ -195,8 +208,6 @@ class AppDelegate: NSObject, NSApplicationDelegate, WKNavigationDelegate {
                 .ytm-animated-thumbnail,
                 /* Banners & promotions */
                 .yt-banner, ytm-banner-promo-renderer,
-                /* Related recommendations grid on watch page */
-                ytm-item-section-renderer[section-identifier="related-items"],
                 /* Hide Shorts, Subscriptions, and You */
                 ytm-pivot-bar-renderer-content[pivot-bar-item-id="pivot-shorts"],
                 ytm-reel-shelf-renderer,
@@ -237,6 +248,17 @@ class AppDelegate: NSObject, NSApplicationDelegate, WKNavigationDelegate {
                     transform: scale(0.85) !important;
                     transform-origin: center center !important;
                 }
+                /* Dim the main video player frame slightly */
+                #player-container-id, .html5-video-player, #player {
+                    opacity: 0.8 !important;
+                }
+
+                /* Dim and completely lock down EVERYTHING below the video player */
+                ytm-single-column-watch-next-results-renderer {
+                    pointer-events: none !important;
+                    opacity: 0.6 !important;
+                    user-select: none !important;
+                }
             `;
 
             var style = document.createElement('style');
@@ -247,6 +269,15 @@ class AppDelegate: NSObject, NSApplicationDelegate, WKNavigationDelegate {
             var wasAdActive = false;
 
             function globalUpdate() {
+                // Update early path detection attributes
+                var pathname = window.location.pathname;
+                var isHome = pathname === '/' || pathname === '';
+                var isSub = pathname.startsWith('/feed/subscriptions');
+                var isWatch = pathname.startsWith('/watch');
+                document.documentElement.setAttribute('data-ytv-home', isHome ? 'true' : 'false');
+                document.documentElement.setAttribute('data-ytv-sub', isSub ? 'true' : 'false');
+                document.documentElement.setAttribute('data-ytv-watch', isWatch ? 'true' : 'false');
+
                 // Check if images need to be hidden/restored
                 var hideImages = window.__hideImages === true;
                 var imgStyle = document.getElementById('yt-audio-air-hide-images');
@@ -279,21 +310,67 @@ class AppDelegate: NSObject, NSApplicationDelegate, WKNavigationDelegate {
                     }
                 }
 
+                // Check if hideHomeFeed needs to be applied/removed
+                var hideHome = window.__hideHomeFeed === true;
+                var homeStyle = document.getElementById('yt-audio-air-hide-home');
+                if (hideHome) {
+                    if (!homeStyle) {
+                        homeStyle = document.createElement('style');
+                        homeStyle.id = 'yt-audio-air-hide-home';
+                        homeStyle.textContent = 'html[data-ytv-home="true"] ytm-browse, html[data-ytv-home="true"] ytm-single-column-browse-results-renderer, html[data-ytv-home="true"] ytm-section-list-renderer, html[data-ytv-home="true"] #contents, html[data-ytv-home="true"] #primary, html[data-ytv-home="true"] .tab-content { display: none !important; height: 0 !important; }';
+                        document.documentElement.appendChild(homeStyle);
+                    }
+                } else {
+                    if (homeStyle) homeStyle.remove();
+                }
+
+                // Check if hideShorts needs to be applied/removed
+                var hideSh = window.__hideShorts === true;
+                var shortsStyle = document.getElementById('yt-audio-air-hide-shorts');
+                if (hideSh) {
+                    if (!shortsStyle) {
+                        shortsStyle = document.createElement('style');
+                        shortsStyle.id = 'yt-audio-air-hide-shorts';
+                        shortsStyle.textContent = 'a[href*="/shorts"], ytm-reel-shelf-renderer, ytm-shorts-lockup-view-model, ytm-shorts-video-renderer, ytm-pivot-bar-item-renderer:has(>.pivot-shorts), ytm-pivot-bar-renderer-content[pivot-bar-item-id="pivot-shorts"] { display: none !important; height: 0 !important; }';
+                        document.documentElement.appendChild(shortsStyle);
+                    }
+                } else {
+                    if (shortsStyle) shortsStyle.remove();
+                }
+
+                // Check if hideSubscriptions needs to be applied/removed
+                var hideSub = window.__hideSubscriptions === true;
+                var subStyle = document.getElementById('yt-audio-air-hide-subscriptions');
+                if (hideSub) {
+                    if (!subStyle) {
+                        subStyle = document.createElement('style');
+                        subStyle.id = 'yt-audio-air-hide-subscriptions';
+                        subStyle.textContent = 'a[href*="/feed/subscriptions"], ytm-pivot-bar-item-renderer:has(>.pivot-subscriptions), ytm-pivot-bar-renderer-content[pivot-bar-item-id="pivot-subscriptions"], html[data-ytv-sub="true"] ytm-browse, html[data-ytv-sub="true"] ytm-single-column-browse-results-renderer, html[data-ytv-sub="true"] ytm-section-list-renderer { display: none !important; height: 0 !important; }';
+                        document.documentElement.appendChild(subStyle);
+                    }
+                } else {
+                    if (subStyle) subStyle.remove();
+                }
+
                 var videos = document.querySelectorAll('video');
                 if (videos.length === 0) return;
-                var video = videos[0]; // Primary video for quality/autoplay controls
+                var video = videos[0];
 
                 var isAd = false;
-                if (document.querySelector('.ad-showing, .ad-interrupting') !== null) {
-                    isAd = true;
-                }
-                var adOverlay = document.querySelector('.ytp-ad-player-overlay, .ytp-ad-overlay-container, .ytm-ad-overlay-renderer');
-                if (adOverlay && adOverlay.offsetHeight > 0) {
-                    isAd = true;
-                }
-                var skipBtn = document.querySelector('.ytp-ad-skip-button, .ytp-ad-skip-button-modern, .ytp-ad-skip-button-slot button, .ytp-ad-skip-button-slot, .ytp-ad-skip-button-container, .ytp-ad-skip-button-container button, .ytm-biz-skip-ad-button');
-                if (skipBtn && skipBtn.offsetHeight > 0) {
-                    isAd = true;
+                if (window.__premiumUser === true) {
+                    isAd = false;
+                } else {
+                    if (document.querySelector('.ad-showing, .ad-interrupting') !== null) {
+                        isAd = true;
+                    }
+                    var adOverlay = document.querySelector('.ytp-ad-player-overlay, .ytp-ad-overlay-container, .ytm-ad-overlay-renderer');
+                    if (adOverlay && adOverlay.offsetHeight > 0) {
+                        isAd = true;
+                    }
+                    var skipBtn = document.querySelector('.ytp-ad-skip-button, .ytp-ad-skip-button-modern, .ytp-ad-skip-button-slot button, .ytp-ad-skip-button-slot, .ytp-ad-skip-button-container, .ytp-ad-skip-button-container button, .ytm-biz-skip-ad-button');
+                    if (skipBtn && skipBtn.offsetHeight > 0) {
+                        isAd = true;
+                    }
                 }
 
                 if (isAd) {
@@ -348,22 +425,21 @@ class AppDelegate: NSObject, NSApplicationDelegate, WKNavigationDelegate {
                 if (!video.playsInline) video.playsInline = true;
                 if (!video.disableRemotePlayback) video.disableRemotePlayback = true;
 
-                // Autoplay handler — only on watch pages, never on home/search
+                // Apply loop setting
+                if (video.loop !== (window.__loopPlayback === true)) {
+                    video.loop = window.__loopPlayback === true;
+                }
+
+                /* Autoplay handler — only on watch pages, never on home/search */
                 var isWatchPage = window.location.pathname.indexOf('/watch') === 0;
                 if (isWatchPage && window.__needsAutoplay && !isAd) {
                     if (!video.paused) {
                         window.__needsAutoplay = false;
                     } else {
-                        var playBtn = document.querySelector('button.player-control-play, .player-play-button, .ytp-large-play-button, button[aria-label="Play"], button[aria-label="Play video"]');
+                        video.play().catch(function(e) {});
+                        var playBtn = document.querySelector('button.player-control-play, .player-play-button, .ytp-large-play-button, button[aria-label="Play"], button[aria-label="Play video"], .ytm-custom-control');
                         if (playBtn && playBtn.offsetHeight > 0) {
                             playBtn.click();
-                            window.__needsAutoplay = false;
-                        } else {
-                            video.play().then(function() {
-                                window.__needsAutoplay = false;
-                            }).catch(function(e) {
-                                // Ignore autoplay block exceptions
-                            });
                         }
                     }
                 }
@@ -425,12 +501,54 @@ class AppDelegate: NSObject, NSApplicationDelegate, WKNavigationDelegate {
         playerWindow.orderBack(nil)
     }
     
+    private func menuIconImage(from original: NSImage) -> NSImage {
+        let size = NSSize(width: 18, height: 18)
+        let newImage = NSImage(size: size)
+        newImage.lockFocus()
+        let rect = NSRect(origin: .zero, size: size)
+        let path = NSBezierPath(roundedRect: rect, xRadius: 4.0, yRadius: 4.0)
+        path.addClip()
+        original.draw(in: rect)
+        newImage.unlockFocus()
+        return newImage
+    }
+
+    private func activeImage(from original: NSImage) -> NSImage {
+        let size = NSSize(width: 18, height: 18)
+        let newImage = NSImage(size: size)
+        newImage.lockFocus()
+        let rect = NSRect(origin: .zero, size: size)
+        let path = NSBezierPath(roundedRect: rect, xRadius: 4.0, yRadius: 4.0)
+        path.addClip()
+        original.draw(in: rect)
+        
+        NSGraphicsContext.current?.saveGraphicsState()
+        let dotRadius: CGFloat = 2.0
+        let dotRect = NSRect(
+            x: size.width - dotRadius * 2,
+            y: 0.0,
+            width: dotRadius * 2,
+            height: dotRadius * 2
+        )
+        let dotPath = NSBezierPath(ovalIn: dotRect)
+        NSColor.systemBlue.setFill()
+        dotPath.fill()
+        NSGraphicsContext.current?.restoreGraphicsState()
+        
+        newImage.unlockFocus()
+        return newImage
+    }
+
     // MARK: - Status Item (Menu Bar Icon)
     
     private func setupStatusItem() {
         statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
         if let button = statusItem?.button {
-            button.image = NSImage(systemSymbolName: "music.note", accessibilityDescription: "YT Audio Air")
+            if let appIcon = NSImage(named: "AppIconImage") {
+                button.image = menuIconImage(from: appIcon)
+            } else {
+                button.image = NSImage(systemSymbolName: "music.note", accessibilityDescription: "YT Audio Air")
+            }
             button.action = #selector(handleStatusItem)
             button.target = self
             button.sendAction(on: [.leftMouseUp, .rightMouseUp])
@@ -475,6 +593,10 @@ class AppDelegate: NSObject, NSApplicationDelegate, WKNavigationDelegate {
         let x = buttonFrameInScreen.origin.x + (buttonFrameInScreen.width / 2) - (windowWidth / 2)
         let y = buttonFrameInScreen.origin.y - windowHeight - 4
         
+        if let appIcon = NSImage(named: "AppIconImage") {
+            button.image = activeImage(from: appIcon)
+        }
+        
         playerWindow.setFrame(NSRect(x: x, y: y, width: windowWidth, height: windowHeight), display: true)
         playerWindow.makeKeyAndOrderFront(nil)
         NSApp.activate(ignoringOtherApps: true)
@@ -484,6 +606,9 @@ class AppDelegate: NSObject, NSApplicationDelegate, WKNavigationDelegate {
     
     func hideWindow() {
         playerWindow.setFrame(NSRect(x: -20000, y: -20000, width: 375, height: 550), display: true)
+        if let appIcon = NSImage(named: "AppIconImage") {
+            statusItem?.button?.image = menuIconImage(from: appIcon)
+        }
         stopMonitoringEvents()
     }
     
@@ -561,6 +686,13 @@ class AppDelegate: NSObject, NSApplicationDelegate, WKNavigationDelegate {
         homeItem.target = self
         menu.addItem(homeItem)
         
+        // Copy Current Link
+        if webView.url != nil {
+            let copyLinkItem = NSMenuItem(title: "Copy Current Link", action: #selector(menuCopyLink), keyEquivalent: "l")
+            copyLinkItem.target = self
+            menu.addItem(copyLinkItem)
+        }
+        
         // Clear Cache Only
         let clearCacheItem = NSMenuItem(title: "Clear Cache Only", action: #selector(menuClearCacheOnly), keyEquivalent: "c")
         clearCacheItem.target = self
@@ -607,6 +739,13 @@ class AppDelegate: NSObject, NSApplicationDelegate, WKNavigationDelegate {
     @objc private func menuGoHome() {
         if let url = URL(string: "https://m.youtube.com") {
             webView.load(URLRequest(url: url))
+        }
+    }
+    
+    @objc private func menuCopyLink() {
+        if let url = webView.url {
+            NSPasteboard.general.clearContents()
+            NSPasteboard.general.setString(url.absoluteString, forType: .string)
         }
     }
     

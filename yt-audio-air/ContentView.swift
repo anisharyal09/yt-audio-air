@@ -27,6 +27,11 @@ struct ContentView: View {
     
     @AppStorage("hideImages") private var hideImages = false
     @AppStorage("grayscale") private var grayscale = false
+    @AppStorage("hideHomeFeed") private var hideHomeFeed = true
+    @AppStorage("hideShorts") private var hideShorts = true
+    @AppStorage("hideSubscriptions") private var hideSubscriptions = true
+    @AppStorage("premiumUser") private var premiumUser = false
+    @AppStorage("loopPlayback") private var loopPlayback = false
     
     var body: some View {
         ZStack {
@@ -41,8 +46,19 @@ struct ContentView: View {
                 )
                 
                 // ── WebView ──
-                WebViewContainer()
-                    .frame(width: 375, height: 480)
+                ZStack(alignment: .bottom) {
+                    WebViewContainer()
+                        .frame(width: 375, height: 480)
+                    
+                    // Gradient overlay to blend bottom of YouTube feed
+                    LinearGradient(
+                        gradient: Gradient(colors: [Color.clear, Color.black.opacity(0.85)]),
+                        startPoint: .top,
+                        endPoint: .bottom
+                    )
+                    .frame(height: 25)
+                    .allowsHitTesting(false)
+                }
                 
                 // ── Footer ──
                 FooterView()
@@ -112,6 +128,56 @@ struct ContentView: View {
                                 .labelsHidden()
                         }
                         
+                        HStack {
+                            Text("Hide Home Feed")
+                                .font(.system(size: 11.5, weight: .medium, design: .rounded))
+                                .foregroundColor(.white.opacity(0.85))
+                            Spacer()
+                            Toggle("", isOn: $hideHomeFeed)
+                                .toggleStyle(.switch)
+                                .labelsHidden()
+                        }
+                        
+                        HStack {
+                            Text("Hide Shorts Feed")
+                                .font(.system(size: 11.5, weight: .medium, design: .rounded))
+                                .foregroundColor(.white.opacity(0.85))
+                            Spacer()
+                            Toggle("", isOn: $hideShorts)
+                                .toggleStyle(.switch)
+                                .labelsHidden()
+                        }
+                        
+                        HStack {
+                            Text("Hide Subscriptions Feed")
+                                .font(.system(size: 11.5, weight: .medium, design: .rounded))
+                                .foregroundColor(.white.opacity(0.85))
+                            Spacer()
+                            Toggle("", isOn: $hideSubscriptions)
+                                .toggleStyle(.switch)
+                                .labelsHidden()
+                        }
+                        
+                        HStack {
+                            Text("YouTube Premium User")
+                                .font(.system(size: 11.5, weight: .medium, design: .rounded))
+                                .foregroundColor(.white.opacity(0.85))
+                            Spacer()
+                            Toggle("", isOn: $premiumUser)
+                                .toggleStyle(.switch)
+                                .labelsHidden()
+                        }
+                        
+                        HStack {
+                            Text("Loop Playback")
+                                .font(.system(size: 11.5, weight: .medium, design: .rounded))
+                                .foregroundColor(.white.opacity(0.85))
+                            Spacer()
+                            Toggle("", isOn: $loopPlayback)
+                                .toggleStyle(.switch)
+                                .labelsHidden()
+                        }
+                        
                         Button(action: {
                             if let url = URL(string: "https://m.youtube.com") {
                                 AppDelegate.shared?.webView.load(URLRequest(url: url))
@@ -165,14 +231,30 @@ struct ContentView: View {
     private func startNavigationPolling() {
         Timer.scheduledTimer(withTimeInterval: 0.5, repeats: true) { _ in
             guard let wv = AppDelegate.shared?.webView else { return }
-            canGoBack = wv.canGoBack
-            canGoForward = wv.canGoForward
-            isLoading = wv.isLoading
-            pageTitle = wv.title ?? "YT Audio Air"
-            
-            let hide = UserDefaults.standard.bool(forKey: "hideImages")
-            let gray = UserDefaults.standard.bool(forKey: "grayscale")
-            wv.evaluateJavaScript("window.__hideImages = \(hide); window.__grayscale = \(gray);", completionHandler: nil)
+            DispatchQueue.main.async {
+                canGoBack = wv.canGoBack
+                canGoForward = wv.canGoForward
+                isLoading = wv.isLoading
+                pageTitle = wv.title ?? "YT Audio Air"
+                
+                let hide = UserDefaults.standard.bool(forKey: "hideImages")
+                let gray = UserDefaults.standard.bool(forKey: "grayscale")
+                let hideHome = UserDefaults.standard.bool(forKey: "hideHomeFeed")
+                let hideSh = UserDefaults.standard.bool(forKey: "hideShorts")
+                let hideSub = UserDefaults.standard.bool(forKey: "hideSubscriptions")
+                let prem = UserDefaults.standard.bool(forKey: "premiumUser")
+                let loop = UserDefaults.standard.bool(forKey: "loopPlayback")
+                
+                wv.evaluateJavaScript("""
+                    window.__hideImages = \(hide);
+                    window.__grayscale = \(gray);
+                    window.__hideHomeFeed = \(hideHome);
+                    window.__hideShorts = \(hideSh);
+                    window.__hideSubscriptions = \(hideSub);
+                    window.__premiumUser = \(prem);
+                    window.__loopPlayback = \(loop);
+                """, completionHandler: nil)
+            }
         }
     }
 }
@@ -359,7 +441,7 @@ struct FooterView: View {
                         NSWorkspace.shared.open(url)
                     }
                 }) {
-                    Text("v1.2.0")
+                    Text("v1.2.1")
                         .font(.system(size: 8.5, weight: .semibold, design: .monospaced))
                         .foregroundColor(hoverVersion ? .white.opacity(0.6) : .white.opacity(0.18))
                 }

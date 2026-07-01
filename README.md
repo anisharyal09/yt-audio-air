@@ -1,12 +1,18 @@
-# 🎵 YT Audio Air
+<div align="center">
+  <br>
+  <img src="yt-audio-air/Assets.xcassets/AppIcon.appiconset/appicon_128x128.png" width="120" height="120" alt="YT Audio Air Logo">
+  <br>
+  <h1>
+    YT Audio Air
+  </h1>
+  <br>
 
-<p align="center">
   <img src="https://img.shields.io/badge/Platform-macOS%2014.0+-blue?logo=apple" alt="Platform: macOS 14.0+" />
-  <a href="updates.md"><img src="https://img.shields.io/badge/App-v1.2.0-green" alt="App Version: v1.2.0" /></a>
+  <a href="updates.md"><img src="https://img.shields.io/badge/App-v1.2.1-green" alt="App Version: v1.2.1" /></a>
   <img src="https://img.shields.io/badge/Built%20with-Swift%205%20%2B%20WKWebView-orange?logo=swift" alt="Built with Swift 5 + WKWebView" />
   <a href="LICENSE"><img src="https://img.shields.io/badge/License-Apache%202.0-blue" alt="License: Apache 2.0" /></a>
   <a href="SECURITY.md"><img src="https://img.shields.io/badge/Security-Policy-brightgreen" alt="Security Policy" /></a>
-</p>
+</div>
 
 A native macOS menu bar app for resource-efficient YouTube audio streaming.
 
@@ -38,7 +44,7 @@ This project was built using Xcode and Swift, with developer assistance from:
 - **Background Playback** — Uses a persistent `NSPanel` with the WebView permanently embedded. Closing the UI parks the window offscreen; audio never stops.
 - **Instant Ad Skipping** — Detects ads via `.ad-showing` class → mutes → 16x speed → seeks to end → clicks skip. Ads vanish silently in milliseconds.
 - **Minimal Resource Usage** — Video element deflated to 1×1px. Quality forced to 144p. GPU raster bypassed. No MutationObservers — single 250ms polling loop handles everything.
-- **Locked-Down Watch Page** — Descriptions, comments, like/share buttons, engagement panels, related videos, and Shorts are all hidden. Only the player and playlist queue are visible.
+- **Locked-Down Watch Page** — The video player frame is slightly dimmed for visual comfort (0.8 opacity). Comments, action bars, and related items are completely hidden, while the remaining title and channel section below the player is permanently locked down, unclickable, and ghosted (0.6 opacity) to maintain a pristine, distraction-free pure audio experience. You can still copy the video link from the status bar right-click menu.
 - **Auto-Unmute** — Defeats YouTube mobile's autoplay muting by continuously forcing `video.muted = false` on watch pages.
 - **Hide Images & Avatars** — Toggle to visually hide all video thumbnails and channel profile pictures. Uses non-collapsing styling to preserve card grid alignment and keep video duration overlays fully visible.
 - **Grayscale Mode** — Native-performance grayscale filter option for the entire interface, hardware layer composited (`will-change: transform`) to prevent WebKit animation or sticky-scroll glitches.
@@ -130,11 +136,11 @@ If you prefer to compile the application locally yourself:
 
 ---
 
-## Contact & Feedback
+## 💡 Troubleshooting & Support
 
-For bug reports, feature requests, or general inquiries:
-* Send an [Email Inquiry](mailto:anish.creations.hq@gmail.com?subject=YT%20Audio%20Air%20-%20Support%20%26%20Feedback) with a descriptive subject line.
-* Contact directly online at [anisharyal09.com.np](https://anisharyal09.com.np/#contact).
+If you encounter any loading issues, playback lags, or general oddities:
+- Simply **refresh/reload the page** by clicking the reload button (`arrow.clockwise`) in the player header to reset the WebKit instance state.
+- If issues persist, please reach out via [Email Inquiry](mailto:anish.creations.hq@gmail.com?subject=YT%20Audio%20Air%20-%20Support%20%26%20Feedback) or contact directly online at [anisharyal09.com.np](https://anisharyal09.com.np/#contact).
 
 ---
 

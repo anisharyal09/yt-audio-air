@@ -2,6 +2,23 @@
 
 All notable changes to this project will be documented in this file.
 
+## [v1.2.1] - 2026-07-02
+
+### Added
+- **Mac Menu Bar App Icon:** Replaced the generic app icon in the menu bar with an app icon.
+- **Active Status Indicator:** Added a custom blue indicator dot overlay at the bottom-right of the menu bar logo when the player popover is open.
+- **Distraction-Free Toggles:** Added new toggle options in the settings panel for **Hide Home Feed**, **Hide Shorts Feed**, and **Hide Subscriptions Feed**, mirroring the features of YT Video Air. All feed toggles now default to `true` on launch as requested.
+- **YouTube Premium Integration:** Added a switch that bypasses ad-skipping behaviors for active YouTube Premium accounts.
+- **Loop Playback:** Added a new switch under the options panel that enables HTML5 video looping natively.
+- **Copy Link on Right-Click:** Added a "Copy Current Link" menu option when right-clicking the status item.
+- **Gradient Fade:** Blended the bottom of the YouTube web feed container with a subtle glassmorphic dark gradient overlay.
+- **Troubleshooting Block:** Documented the page-reload workaround inside the README for easy self-servicing.
+
+### Fixed
+- **Status Bar Icon Rendering:** Clipped the menu bar logo to a rounded rect and disabled template color masking to resolve the solid white block display issue.
+- **Thread Concurrency Warnings:** Wrapped WebKit updates in `DispatchQueue.main.async` to ensure thread-safety on UI/KVO bindings.
+- **Watch Page Lockdown Refined:** Perfected the distraction-free UI by permanently hiding related videos and comments, while intelligently dimming the video player frame (`0.8` opacity) and the remaining metadata area below the player (`0.6` opacity with complete click-blocking), delivering a clean, focus-oriented ghosted aesthetic.
+
 ## [v1.2.0] - 2026-06-16
 (updated 2026-06-19)
 
